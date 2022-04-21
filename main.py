@@ -12,6 +12,7 @@ class Path:
             else: message += node
         return message
 
+
 class Demand:
     def __init__(self,block):
         lines = block.split('\n')
