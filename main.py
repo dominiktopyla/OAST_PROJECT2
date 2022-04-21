@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Path:
     def __init__(self,line):
         parameters = line.split(' ')
@@ -11,7 +14,6 @@ class Path:
             if index<len(self.path)-1: message += node +'-'
             else: message += node
         return message
-
 
 class Demand:
     def __init__(self,block):
@@ -53,7 +55,7 @@ class Network:
         self.links = []
         self.numberOfDemands = None
         self.demands = []
-
+    
     def parse(self,filename):
         file = open(filename)
         content = file.read()
@@ -79,7 +81,7 @@ class Network:
         lines.pop(0)
         for line in lines:
             self.demands.append(Demand(line))
-
+    
     def show(self):
         print('-'*70)
         print(' '*30,'PARAMETRY')
@@ -90,6 +92,18 @@ class Network:
         print('Liczba żądań:',self.numberOfDemands,'\n')
         [print(demand) for demand in self.demands]
         print('-'*70)
+    
+    def stopCondition(self):
+        pass
+    
+    def evolution(self):
+        pass
+    
+    def getRandomState(self):
+        state = np.random.get_state()
+    
+    def setRandomState(self):
+        np.random.random()
 
 
 
@@ -98,5 +112,5 @@ class Network:
 
 if __name__ == "__main__":
     n1 = Network()
-    n1.parse('input/net12_1.txt')
+    n1.parse('input/net4.txt')
     n1.show()
