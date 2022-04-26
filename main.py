@@ -93,11 +93,44 @@ class Network:
         [print(demand) for demand in self.demands]
         print('-'*70)
     
-    def stopCondition(self):
-        pass
+    #################################################################################
+    ############################## ALGORYTM EWOLUCYJNY ##############################
+    #################################################################################
     
     def evolution(self):
         pass
+    
+    def stopCondition(self):
+        return True
+    
+    def generatePopulation(self):
+        pass
+    
+    def childAnalyse(self):
+        pass
+    
+    def selection(self):
+        pass
+    
+    def crossover(self):
+        pass
+    
+    def mutation(self):
+        pass
+    
+    def chooseBest(self):
+        pass
+    
+    #################################################################################
+    ################################## BRUTE FORCE ##################################
+    #################################################################################
+    
+    def bruteForce(self):
+        pass
+    
+    #################################################################################
+    #################################################################################
+    #################################################################################
     
     def getRandomState(self):
         state = np.random.get_state()
