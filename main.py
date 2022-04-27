@@ -1,5 +1,5 @@
 import numpy as np
-import scipy
+import scipy.special
 
 
 
@@ -28,12 +28,33 @@ class Demand:
         self.paths = []
         paths = lines[2:self.numberOfPaths+2]
         for path in paths:
-            self.paths.append(Path(path))        
+            self.paths.append(Path(path))    
+        ################ BRUTE FORCE ################
+        self.flowDistributionCounter = 0
+        self.flowDistribution = [0]*self.numberOfPaths
+        self.nextFlowDistribution()
+        self.numberOfFlowDistributions = scipy.special.binom(self.volume+self.numberOfPaths-1,self.volume)
+    
+    def nextFlowDistribution(self):
+        while True:
+            self.flowDistribution[0]+=1
+            for index,flow in enumerate(self.flowDistribution):
+                if flow > self.volume:
+                    self.flowDistribution[index]=0
+                    self.flowDistribution[(index+1)%self.numberOfPaths]+=1
+            if sum(self.flowDistribution) == self.volume:
+                self.flowDistributionCounter+=1
+                break
+        #############################################    
+    def setFlowOptions(self,flowOptions):
+        self.flowOptions = flowOptions
     def __str__(self):
         message = '[ŻĄDANIE]: '+str(self.startNode)+'--'+str(self.endNode)+'\n\tzapotrzebowanie='+str(self.volume)+'\n'
         for path in self.paths:
             message += str(path) + '\n'
         return message
+# '1 2 3 \n3 \n1 1 \n2 2 3 \n3 2 5 4 '
+# while d.flowDistributionCounter == d.numberOfFlowDistributions: d.nextFlowDistribution()
 
 class Link:
     def __init__(self,line,id):
@@ -80,7 +101,7 @@ class Network:
         lines = both[1]
         lines = lines.split('\n\n')
         lines = list(filter(None, lines))
-        self.numberOfDemands = lines[0]
+        self.numberOfDemands = int(lines[0])
         lines.pop(0)
         for line in lines:
             self.demands.append(Demand(line))
@@ -143,11 +164,22 @@ class Network:
     #################################################################################
     
     def bruteForce(self):
-        F = float('inf')
-        numberOfPaths = 3
-        numberOfFlows = 4
-        x = [[None]*numberOfPaths]*numberOfFlows
-        self.rec(1,1,self.h(1),x)
+        self.numberOfSolutions = self.getNumberOfSolutions()
+        print('ROZWIĄZAŃ:',self.numberOfSolutions)
+        
+        
+        
+        
+        # for index,demand in enumerate(self.demands):
+        #     flowOptions = self.getFlowCombinations(demand.volume,demand.numberOfPaths)
+        #     demand.setFlowOptions(flowOptions)
+        #     self.printProgressBar(index+1,self.numberOfDemands,suffix='Generowanie przypadków podziału przepływności')
+        
+        # F = float('inf')
+        # numberOfPaths = 3
+        # numberOfFlows = 4
+        # x = [[None]*numberOfPaths]*numberOfFlows
+        # self.rec(1,1,self.h(1),x)
     
     
     def rec(self,demandId,pathId,lefth,x):
@@ -172,19 +204,30 @@ class Network:
         #demands Volume
         pass
     
-    def numberOfSolutions(self,network):
-        solutions = 1
-        for demand in network.demands:
-            newton = self.Newton(demand.volume,demand.numberOfPaths)
-            print(newton)
-            solutions*=newton
-        return solutions
+    def getFlowCombinations(self,flowSum,paths):
+        x = [0]*paths
+        l = []
+        for i in range(pow(flowSum+1,paths)):
+            if sum(x) == flowSum:
+                l.append(x)
+            x[0]+=1
+            for i in range(len(x)):
+                if x[len(x)-1] > flowSum:
+                    return l
+                if x[i] > flowSum:
+                    x[i] = 0
+                    x[i+1]+=1
+        # return [[int(digit) for digit in str(number).zfill(paths)] for number in range(1,pow(10,paths+1)-1) if sum([int(digit) for digit in str(number)])==flowSum]
+            
+        
     
-    def Newton(self,n,k):
-        newton = float(1)
-        for i in range(1,k+1):
-            newton = newton*(n-i+1)/i
-        return newton
+    def getNumberOfSolutions(self):
+        solutions = 1
+        for demand in self.demands:
+            k = demand.volume
+            n = demand.numberOfPaths
+            solutions*=scipy.special.binom(k+n-1,k)
+        return int(solutions)
     
     #################################################################################
     #################################################################################
@@ -195,12 +238,24 @@ class Network:
     
     def setRandomState(self):
         np.random.random()
+        
+    def printProgressBar (self,iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + ' ' * (length - filledLength)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        if iteration == total: 
+            print()
 
 
+
+
+    
+    
+    
+    
 if __name__ == "__main__":
     n1 = Network()
     n1.parse('input/net4.txt')
-    n1.show()
-    
-    # print('ROZWIĄZAŃ:',numberOfSolutions(n1))
-    
+    # n1.show()
+    n1.bruteForce()
