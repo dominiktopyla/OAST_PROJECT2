@@ -1,8 +1,6 @@
-from hashlib import new
 import numpy as np
 import scipy.special, time, math
 import copy
-from collections import namedtuple
 
 class Path:
     def __init__(self,line):
@@ -128,12 +126,12 @@ class Network:
         demandPart = str(self.numberOfDemands)+'\n'
         for index,solution in enumerate(self.bestSolutions):
             if index == 0 or self.saveAllBFSolutions:
-                demandPart+='\n'
                 for demand in solution:
                     demandFlow = str(demand.id)+' '+str(demand.numberOfPaths)+'\n'
                     for index,flow in enumerate(demand.flowDistribution):
                         demandFlow+=str(index+1)+' '+str(flow)+'\n'
                     demandPart+=demandFlow+'\n'
+                demandPart+='---\n\n'
         
         output = linkPart+'\n'+demandPart
         print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
@@ -168,35 +166,35 @@ class Network:
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
         F=min(destinationValues)
         while self.stopCondition(generation):
-            print('POPULATION: F=',F,'\tgeneracja:',generation)
-            [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
+            # print('POPULATION: F=',F,'\tgeneracja:',generation)
+            # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
             temporaryPopulation = self.reproduction(population,destinationValues)
-            print('TMP POPULATION:')
-            [print(chromosome) for chromosome in temporaryPopulation]
+            # print('TMP POPULATION:')
+            # [print(chromosome) for chromosome in temporaryPopulation]
             temporaryPopulation = self.crossover(temporaryPopulation,crossoverProbability)
-            print('AFTER CROSSOVER:')
-            [print(chromosome) for chromosome in temporaryPopulation]
+            # print('AFTER CROSSOVER:')
+            # [print(chromosome) for chromosome in temporaryPopulation]
             temporaryPopulation = self.mutation(temporaryPopulation,mutationProbability)
-            print('AFTER MUTATION:')
-            [print(chromosome) for chromosome in temporaryPopulation]
+            # print('AFTER MUTATION:')
+            # [print(chromosome) for chromosome in temporaryPopulation]
             bestPopulation = self.chooseBest(population,temporaryPopulation,numberOfChromosomes,problem,links,demands)
-            print('BEST POPULATION:')
-            [print(chromosome) for chromosome in bestPopulation]
+            # print('BEST POPULATION:')
+            # [print(chromosome) for chromosome in bestPopulation]
             population = bestPopulation
             
             destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
             if F == min(destinationValues):
                 self.bestForNCounter+=1
             else: self.bestForNCounter=0
-            # if min(destinationValues)<F:
-            #     F = min(destinationValues)
-            #     print('POPULATION: F=',F,'\tgeneracja:',generation)
-            #     [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
-            print('-'*70)
+            if min(destinationValues)<F:
+                F = min(destinationValues)
+                print('POPULATION: F=',F,'\tgeneracja:',generation)
+                [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
+            # print('-'*70)
             generation+=1
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
-        print('LAST POPULATION: F=',min(destinationValues),'\tgeneracja:',generation)
-        [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
+        # print('LAST POPULATION: F=',min(destinationValues),'\tgeneracja:',generation)
+        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
 
         bestChromosome = population[np.argmin(destinationValues)]
         self.bestSolutions = [self.demands]
@@ -444,12 +442,12 @@ if __name__ == "__main__":
     inputFileName = 'net4.txt'
     outputFileName = 'result.txt'
     problem = 'DDAP'             # ['DAP'|'DDAP']
-    method = 'Brute Force'            # ['Brute Force'|'Evolution']
+    method = 'Evolution'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
     numberOfChromosomes=4
     stopConditionType='generations'# ['time'|'generations'|'mutations'|'bestForN']
-    stopConditionValue=5
+    stopConditionValue=10
     saveAllBFSolutions=True
     
     simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions)
