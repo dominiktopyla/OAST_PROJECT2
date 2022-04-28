@@ -141,25 +141,29 @@ class Network:
     
     ############################## ALGORYTM EWOLUCYJNY ##############################
     
-    def evolution(self,problem = 'DAP'):
+    def evolution(self,problem = 'DAP',crossoverProbability=0.75,mutationProbability=0.05,numberOfChromosomes=8):
         """
-        link = [load,capacity,lambdas]
+        link = [load,capacity,lambdas,fibreCost]
         demand = [volume,paths,flows]
         """
-        links = [[0,link.capacity,link.lambdas] for link in self.links]
+        links = [[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links]
         demands = [[demand.volume,demand.paths,[]] for demand in self.demands]
         generation = 0
-        self.generatePopulation()
-        P = self.getPopulation()
-        print(P)
-        self.childAnalyse(P,problem,links,demands)
-        while self.stopCondition(generation):
-            T = self.reproduction(P)
-            # O = self.crossover(T,P)
-            # O = self.mutation(O)
-            # self.childAnalyse(O,problem,links,demands)
-            # P = O            
-            generation+=1
+        population = [self.generateChromosome() for chromosome in range(numberOfChromosomes)]
+        print('POPULATION:')
+        [print(chromosome) for chromosome in population]
+
+
+        destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
+        print('DESTINATION',destinationValues)
+
+        # while self.stopCondition(generation):
+        #     T = self.reproduction(P)
+        #     # O = self.crossover(T,P)
+        #     # O = self.mutation(O)
+        #     # self.childAnalyse(O,problem,links,demands)
+        #     # P = O            
+        #     generation+=1
     
     def stopCondition(self,generation):
         if generation<5: return True
@@ -172,14 +176,16 @@ class Network:
         for index,demand in (self.demands):
             demand.flowDistribution=P[index]
 
-    def generatePopulation(self):
-        for demand in self.demands:
-            randomArray = np.random.randint(0,demand.numberOfPaths,demand.volume)
-            demand.flowDistribution[0]=0
-            for index in randomArray:
-                demand.flowDistribution[index]+=1
+    def generateChromosome(self):
+        chromosome = []
+        for index,gene in enumerate(self.demands):
+            randomArray = np.random.randint(0,gene.numberOfPaths,gene.volume)
+            chromosome.append([0]*gene.numberOfPaths)
+            for value in randomArray:
+                chromosome[index][value]+=1
+        return chromosome
     
-    def childAnalyse(self,P,problem,links,demands):
+    def destinationFunction(self,P,problem,links,demands):
         if problem == 'DAP': return self.EAcalculateDAP(P,links,demands)
         elif problem == 'DDAP': return self.EAcalculateDDAP(P,links,demands)
     
@@ -199,33 +205,53 @@ class Network:
         pass
     
     def EAcalculateDAP(self,P,links,demands):
-        links = self.EAsetLoads(P,links,demands)
-        print(links)
-        # F = -float('inf')
-        # for link in self.links:
-        #     overload = link.load-link.capacity
-        #     F = max(overload,F)
-        # return F
+        # links = copy([[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links])
+        links, demands = self.EAsetLoads(P,links,demands)
+        # print('-'*30)
+        # print('LINKS:',links)
+        # for demand in demands:
+        #     print('DEMAND')
+        #     for index,path in enumerate(demand[1]):
+        #         print(path,demand[2][index])
+        # print('-'*30)
+        F = -float('inf')
+        for link in links:
+            overload = link[0]-link[1]
+            F = max(overload,F)
+        # print('F:',F)
+        return F
     
     def EAcalculateDDAP(self,P,links,demands):
         links = self.EAsetLoads(P,links,demands)
-        print(links)
-        # F = 0
-        # for link in self.links:
-        #     y =math.ceil(link.load/link.lambdas)
-        #     F += y*link.fibreCost
-        # return F
+        F = 0
+        for link in links:
+            y =math.ceil(link[0]/link[2])
+            F += y*link[3]
+        return F
 
-    def EAsetLoads(self,P,links,demands):
+    def EAsetLoads(self,chromosome,links,demands):
         for index,demand in enumerate(demands):
-            demand[2]=P[index]
+            demand[2]=chromosome[index]
+        for demandIndex,demand in enumerate(self.demands):
+            for index,path in enumerate(demand.paths):
+                flow = chromosome[demandIndex][index]
+                if flow:
+                    for link in path.path:
+                        # print('do linku',link,'dodano',flow)
+                        links[link-1][0] += flow
+                    
+        return links,demands
+
+    def BFsetLoads1(self):
+        for link in self.links:
+            link.load = 0
         for demand in self.demands:
             for index,path in enumerate(demand.paths):
                 flow = demand.flowDistribution[index]
                 if flow:
                     for link in path.path:
-                        links[link-1][0] += flow    
-        return links
+                        self.links[link-1].load += flow
+
 
     ############################# ALGORYTM BRUTE FORCE ##############################
     
@@ -319,7 +345,7 @@ class Network:
 if __name__ == "__main__":
     n1 = Network()
     n1.parse('input/net4.txt')
-    n1.show()
+    # n1.show()
     # n1.bruteForce('DAP')
     # n1.bruteForce('DDAP')
     n1.evolution('DAP')
