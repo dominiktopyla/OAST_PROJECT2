@@ -142,15 +142,25 @@ class Network:
     ############################## ALGORYTM EWOLUCYJNY ##############################
     
     def evolution(self,problem = 'DAP'):
-        pass
+        generation = 0
+        P = None
+        self.childAnalyse(P,problem)
+        while self.stopCondition(generation):
+            T = self.reproduction(P)
+            O = self.crossover(T,P)
+            O = self.mutation(O)
+            self.childAnalyse(O,problem)
+            P = O            
+            generation+=1
     
-    def stopCondition(self):
-        return True
+    def stopCondition(self,generation):
+        if generation<5: return True
+        else: return False
     
     def generatePopulation(self):
         pass
     
-    def childAnalyse(self):
+    def childAnalyse(self,problem):
         pass
     
     def selection(self):
@@ -161,6 +171,9 @@ class Network:
     
     def mutation(self):
         pass
+    
+    def reproduction(self,P):
+        return None
     
     def chooseBest(self):
         pass
