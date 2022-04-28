@@ -30,11 +30,11 @@ class Demand:
         paths = lines[2:self.numberOfPaths+2]
         for path in paths:
             self.paths.append(Path(path))    
-        ################ BRUTE FORCE ################
+        
         self.flowDistributionCounter = 0
         self.flowDistribution = [0]*self.numberOfPaths
         self.nextFlowDistribution()
-        self.numberOfFlowDistributions = scipy.special.binom(self.volume+self.numberOfPaths-1,self.volume)
+        self.numberOfFlowDistributions = scipy.special.binom(self.volume+self.numberOfPaths-1,self.numberOfPaths-1)
     
     def nextFlowDistribution(self):
         while True:
@@ -50,7 +50,6 @@ class Demand:
     def resetFlowDistributionCounter(self):
         self.flowDistributionCounter = 0
         
-        #############################################    
     def setFlowOptions(self,flowOptions):
         self.flowOptions = flowOptions
     def __str__(self):
@@ -96,12 +95,9 @@ class Network:
         lines = both[0]
         lines = lines.split('\n')
         
-        # number of links
-        self.numberOfLinks = int(lines[0])
-        
         # links
+        self.numberOfLinks = int(lines[0])
         links = lines[1:self.numberOfLinks+1]
-        
         for i,link in enumerate(links):
             self.links.append(Link(link,i+1))
         
@@ -143,11 +139,9 @@ class Network:
         [print(demand) for demand in self.demands]
         print('-'*70)
     
-    #################################################################################
     ############################## ALGORYTM EWOLUCYJNY ##############################
-    #################################################################################
     
-    def evolution(self):
+    def evolution(self,problem = 'DAP'):
         pass
     
     def stopCondition(self):
@@ -171,9 +165,7 @@ class Network:
     def chooseBest(self):
         pass
     
-    #################################################################################
     ############################# ALGORYTM BRUTE FORCE ##############################
-    #################################################################################
     
     def bruteForce(self,problem = 'DAP'):
         self.numberOfSolutions = self.getNumberOfSolutions()
@@ -199,11 +191,9 @@ class Network:
                 self.printProgressBar(counter+1,self.numberOfSolutions,suffix='Rozpatrzone przypadki: '+str(counter),decimals=0)
             counter+=1
         self.F = F
-        # self.printBestSolutions(F,problem)
-        self.saveResultsToFile('output/'+problem+'.txt')
+        self.printBestSolutions(F,problem)
+        self.saveResultsToFile('output/BruteForce'+problem+'.txt')
     
-    #################################################################################
-    #################################################################################
     #################################################################################
     
     def calculateDAP(self):
@@ -235,26 +225,25 @@ class Network:
     def printBestSolutions(self,F,problem):
         print('\nBrute Force',problem,'\nminF:',F)
         print('Rozwiązań:',len(self.bestSolutions))
-        for solution in self.bestSolutions:
-            for demand in solution:
-                print(demand.flowDistribution)
-            print()
+        # for solution in self.bestSolutions:
+        #     for demand in solution:
+        #         print(demand.flowDistribution,end=' ')
+        #     print()
     
     def getNumberOfSolutions(self):
         solutions = 1
         for demand in self.demands:
             k = demand.volume
             n = demand.numberOfPaths
-            solutions*=scipy.special.binom(k+n-1,k)
+            solutions*=scipy.special.binom(k+n-1,n-1)
         return int(solutions)
-    
     
     def getRandomState(self):
         state = np.random.get_state()
     
     def setRandomState(self):
         np.random.random()
-        
+    
     def printProgressBar (self,iteration, total, prefix = '', suffix = '', decimals = 1, length = 80, fill = '█', printEnd = "\r"):
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
         filledLength = int(length * iteration // total)
