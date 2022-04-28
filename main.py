@@ -1,6 +1,6 @@
 import numpy as np
-import scipy.special
-
+import scipy.special, time, math
+import copy
 
 
 class Path:
@@ -9,16 +9,17 @@ class Path:
         parameters = list(filter(None, parameters))
         self.id = int(parameters[0])
         parameters.pop(0)
-        self.path = parameters
+        self.path = [int(parameter) for parameter in parameters]
     def __str__(self):
         message = '\t[ŚCIEŻKA] '+str(self.id)+': '
-        for index,node in enumerate(self.path):
-            if index<len(self.path)-1: message += node +'-'
-            else: message += node
-        return message
+        for index,link in enumerate(self.path):
+            if index<len(self.path)-1: message += str(link) +'-'
+            else: message += str(link)
+        return message.ljust(25)
 
 class Demand:
-    def __init__(self,block):
+    def __init__(self,block,id):
+        self.id = id
         lines = block.split('\n')
         parameters = lines[0].split(' ')
         self.startNode = int(parameters[0])
@@ -45,16 +46,18 @@ class Demand:
             if sum(self.flowDistribution) == self.volume:
                 self.flowDistributionCounter+=1
                 break
+        
+    def resetFlowDistributionCounter(self):
+        self.flowDistributionCounter = 0
+        
         #############################################    
     def setFlowOptions(self,flowOptions):
         self.flowOptions = flowOptions
     def __str__(self):
-        message = '[ŻĄDANIE]: '+str(self.startNode)+'--'+str(self.endNode)+'\n\tzapotrzebowanie='+str(self.volume)+'\n'
-        for path in self.paths:
-            message += str(path) + '\n'
+        message = '[ŻĄDANIE] '+str(self.id)+': '+str(self.startNode)+'--'+str(self.endNode)+'\n\tzapotrzebowanie='+str(self.volume)+'\n'
+        for index,path in enumerate(self.paths):
+            message += str(path) + '-> ' + str(self.flowDistribution[index]) + '\n'
         return message
-# '1 2 3 \n3 \n1 1 \n2 2 3 \n3 2 5 4 '
-# while d.flowDistributionCounter == d.numberOfFlowDistributions: d.nextFlowDistribution()
 
 class Link:
     def __init__(self,line,id):
@@ -65,7 +68,10 @@ class Link:
         self.pairsInCable = int(parameters[2])
         self.fibreCost = int(parameters[3])
         self.lambdas = int(parameters[4])
+        
         self.load = 0
+        self.capacity = self.pairsInCable*self.lambdas
+        
     def __str__(self):
         return '[POŁĄCZENIE] '+str(self.id)+': '+str(self.startNode)\
             +'--'+str(self.endNode)\
@@ -79,6 +85,8 @@ class Network:
         self.links = []
         self.numberOfDemands = None
         self.demands = []
+        self.bestSolutions = []
+        self.F = None
     
     def parse(self,filename):
         file = open(filename)
@@ -103,8 +111,26 @@ class Network:
         lines = list(filter(None, lines))
         self.numberOfDemands = int(lines[0])
         lines.pop(0)
-        for line in lines:
-            self.demands.append(Demand(line))
+        for id,line in enumerate(lines):
+            self.demands.append(Demand(line,id+1))
+    
+    def saveResultsToFile(self,fileName):
+        file = open(fileName,'w')
+        linkPart = str(self.numberOfLinks)+'\n'
+        for link in self.links:
+            linkPart+=str(link.id)+' '+str(link.lambdas)+' '+str(link.pairsInCable)+'\n'
+        
+        demandPart = str(self.numberOfDemands)+'\n'
+        for demand in self.bestSolutions[0]:
+            demandFlow = str(demand.id)+' '+str(demand.numberOfPaths)+'\n'
+            for index,flow in enumerate(demand.flowDistribution):
+                demandFlow+=str(index+1)+' '+str(flow)+'\n'
+            demandPart+=demandFlow+'\n'
+        
+        output = linkPart+'\n'+demandPart
+        print('\nPLIK ('+fileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
+        file.write(output)
+        file.close()
     
     def show(self):
         print('-'*70)
@@ -116,21 +142,7 @@ class Network:
         print('Liczba żądań:',self.numberOfDemands,'\n')
         [print(demand) for demand in self.demands]
         print('-'*70)
-
-    def calculateLinkLoads(self):
-        for demand in self.demands:
-            for path in demand.paths:
-                for link in path.path:
-                    self.links[int(link)-1].load = self.links[int(link)-1].load + int(demand.volume)
-
-# for demand in n1.demands:
-#     for path in demand.paths:
-#         for link in path.path:
-#             n1.links[int(link)-1].load = n1.links[int(link)-1].load + int(demand.volume)
-
-# for link in n1.links:
-#     print(link.load)
-
+    
     #################################################################################
     ############################## ALGORYTM EWOLUCYJNY ##############################
     #################################################################################
@@ -160,66 +172,73 @@ class Network:
         pass
     
     #################################################################################
-    ################################## BRUTE FORCE ##################################
+    ############################# ALGORYTM BRUTE FORCE ##############################
     #################################################################################
     
-    def bruteForce(self):
+    def bruteForce(self,problem = 'DAP'):
         self.numberOfSolutions = self.getNumberOfSolutions()
-        print('ROZWIĄZAŃ:',self.numberOfSolutions)
-        
-        
-        
-        
-        # for index,demand in enumerate(self.demands):
-        #     flowOptions = self.getFlowCombinations(demand.volume,demand.numberOfPaths)
-        #     demand.setFlowOptions(flowOptions)
-        #     self.printProgressBar(index+1,self.numberOfDemands,suffix='Generowanie przypadków podziału przepływności')
-        
-        # F = float('inf')
-        # numberOfPaths = 3
-        # numberOfFlows = 4
-        # x = [[None]*numberOfPaths]*numberOfFlows
-        # self.rec(1,1,self.h(1),x)
+        print('\n  ROZWIĄZAŃ:',self.numberOfSolutions,'\n')
+        counter = 0
+        F = float('inf')
+        while counter <= self.numberOfSolutions:
+            if problem == 'DAP': Ftemp = self.calculateDAP()
+            elif problem == 'DDAP': Ftemp = self.calculateDDAP()
+            if Ftemp < F:
+                F = Ftemp
+                c = copy.deepcopy(self.demands)
+                self.bestSolutions = [c]
+            elif Ftemp == F:
+                c = copy.deepcopy(self.demands)
+                self.bestSolutions.append(c)
+            self.demands[0].nextFlowDistribution()
+            for index,demand in enumerate(self.demands):
+                if demand.flowDistributionCounter > demand.numberOfFlowDistributions:
+                    demand.resetFlowDistributionCounter()
+                    self.demands[(index+1)%self.numberOfDemands].nextFlowDistribution()
+            if not counter%int(self.numberOfSolutions*0.01):
+                self.printProgressBar(counter+1,self.numberOfSolutions,suffix='Rozpatrzone przypadki: '+str(counter),decimals=0)
+            counter+=1
+        self.F = F
+        # self.printBestSolutions(F,problem)
+        self.saveResultsToFile('output/'+problem+'.txt')
     
+    #################################################################################
+    #################################################################################
+    #################################################################################
     
-    def rec(self,demandId,pathId,lefth,x):
-        # lefth -  remaining part of current demand’s volume
-        # x - solution, two dimensional array of path-flows
-        if pathId == self.P(demandId):
-            x[demandId][pathId]=lefth
-            if demandId < self.numberOfDemands:
-                self.rec(demandId+1,1,self.h(demandId+1),x)
-            else:
-                print(x)
-        else:
-            for parth in range(0,lefth):
-                x[demandId][pathId]
-                self.rec(demandId,pathId+1,lefth-parth,x)
+    def calculateDAP(self):
+        self.setLoads()
+        F = -float('inf')
+        for link in self.links:
+            overload = link.load-link.capacity
+            F = max(overload,F)
+        return F
     
-    def P(self,curd):
-        #number of demands paths
-        return True    
+    def calculateDDAP(self):
+        self.setLoads()
+        F = 0
+        for link in self.links:
+            y =math.ceil(link.load/link.lambdas)
+            F += y*link.fibreCost
+        return F
     
-    def h(self,curd):
-        #demands Volume
-        pass
+    def setLoads(self):
+        for link in self.links:
+            link.load = 0
+        for demand in self.demands:
+            for index,path in enumerate(demand.paths):
+                flow = demand.flowDistribution[index]
+                if flow:
+                    for link in path.path:
+                        self.links[link-1].load += flow
     
-    def getFlowCombinations(self,flowSum,paths):
-        x = [0]*paths
-        l = []
-        for i in range(pow(flowSum+1,paths)):
-            if sum(x) == flowSum:
-                l.append(x)
-            x[0]+=1
-            for i in range(len(x)):
-                if x[len(x)-1] > flowSum:
-                    return l
-                if x[i] > flowSum:
-                    x[i] = 0
-                    x[i+1]+=1
-        # return [[int(digit) for digit in str(number).zfill(paths)] for number in range(1,pow(10,paths+1)-1) if sum([int(digit) for digit in str(number)])==flowSum]
-            
-        
+    def printBestSolutions(self,F,problem):
+        print('\nBrute Force',problem,'\nminF:',F)
+        print('Rozwiązań:',len(self.bestSolutions))
+        for solution in self.bestSolutions:
+            for demand in solution:
+                print(demand.flowDistribution)
+            print()
     
     def getNumberOfSolutions(self):
         solutions = 1
@@ -229,9 +248,6 @@ class Network:
             solutions*=scipy.special.binom(k+n-1,k)
         return int(solutions)
     
-    #################################################################################
-    #################################################################################
-    #################################################################################
     
     def getRandomState(self):
         state = np.random.get_state()
@@ -239,7 +255,7 @@ class Network:
     def setRandomState(self):
         np.random.random()
         
-    def printProgressBar (self,iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    def printProgressBar (self,iteration, total, prefix = '', suffix = '', decimals = 1, length = 80, fill = '█', printEnd = "\r"):
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
         filledLength = int(length * iteration // total)
         bar = fill * filledLength + ' ' * (length - filledLength)
@@ -249,13 +265,9 @@ class Network:
 
 
 
-
-    
-    
-    
-    
 if __name__ == "__main__":
     n1 = Network()
     n1.parse('input/net4.txt')
-    # n1.show()
-    n1.bruteForce()
+    n1.show()
+    n1.bruteForce('DAP')
+    n1.bruteForce('DDAP')
