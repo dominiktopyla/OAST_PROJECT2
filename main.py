@@ -1,3 +1,4 @@
+from hashlib import new
 import numpy as np
 import scipy.special, time, math
 import copy
@@ -30,7 +31,7 @@ class Demand:
         paths = lines[2:self.numberOfPaths+2]
         for path in paths:
             self.paths.append(Path(path))    
-        
+
         self.flowDistributionCounter = 0
         self.flowDistribution = [0]*self.numberOfPaths
         self.nextFlowDistribution()
@@ -79,16 +80,21 @@ class Link:
             +',\tlambdy='+str(self.lambdas)
 
 class Network:
-    def __init__(self):
+    def __init__(self,inputFileName,outputFileName):
         self.numberOfLinks = None
         self.links = []
         self.numberOfDemands = None
         self.demands = []
         self.bestSolutions = []
         self.F = None
+        self.inputFileName = inputFileName
+        self.outputFileName = outputFileName
+        self.stopConditionType=None
+        self.stopConditionValue=None
+        self.initTime=None
     
-    def parse(self,filename):
-        file = open(filename)
+    def parse(self):
+        file = open('input/'+self.inputFileName)
         content = file.read()
         file.close()
         both  = content.split('-1')
@@ -110,8 +116,8 @@ class Network:
         for id,line in enumerate(lines):
             self.demands.append(Demand(line,id+1))
     
-    def saveResultsToFile(self,fileName):
-        file = open(fileName,'w')
+    def saveResultsToFile(self):
+        file = open('output/'+self.outputFileName,'w')
         linkPart = str(self.numberOfLinks)+'\n'
         for link in self.links:
             linkPart+=str(link.id)+' '+str(link.lambdas)+' '+str(link.pairsInCable)+'\n'
@@ -124,7 +130,7 @@ class Network:
             demandPart+=demandFlow+'\n'
         
         output = linkPart+'\n'+demandPart
-        print('\nPLIK ('+fileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
+        print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
         file.write(output)
         file.close()
     
@@ -141,30 +147,57 @@ class Network:
     
     ############################## ALGORYTM EWOLUCYJNY ##############################
     
-    def evolution(self,problem = 'DAP',crossoverProbability=0.75,mutationProbability=0.05,numberOfChromosomes=8):
+    def evolution(self,problem,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue):
         """
         link = [load,capacity,lambdas,fibreCost]
         demand = [volume,paths,flows]
         """
+        self.stopConditionType = stopConditionType
+        self.stopConditionValue = stopConditionValue
+        if stopConditionValue == 'time': self.initTime = time.time()
         links = [[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links]
         demands = [[demand.volume,demand.paths,[]] for demand in self.demands]
         generation = 0
         population = [self.generateChromosome() for chromosome in range(numberOfChromosomes)]
-        print('POPULATION:')
-        [print(chromosome) for chromosome in population]
-
-
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
-        print('DESTINATION',destinationValues)
+        F=min(destinationValues)
+        while self.stopCondition(generation):
+            print('POPULATION: F=',F,'\tgeneracja:',generation)
+            [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
+            temporaryPopulation = self.reproduction(population,destinationValues)
+            print('TMP POPULATION:')
+            [print(chromosome) for chromosome in temporaryPopulation]
+            temporaryPopulation = self.crossover(temporaryPopulation,crossoverProbability)
+            print('AFTER CROSSOVER:')
+            [print(chromosome) for chromosome in temporaryPopulation]
+            temporaryPopulation = self.mutation(temporaryPopulation,mutationProbability)
+            print('AFTER MUTATION:')
+            [print(chromosome) for chromosome in temporaryPopulation]
+            bestPopulation = self.chooseBest(population,temporaryPopulation,numberOfChromosomes,problem,links,demands)
+            print('BEST POPULATION:')
+            [print(chromosome) for chromosome in bestPopulation]
+            population = bestPopulation
+            
+            destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
+            # if min(destinationValues)<F:
+            #     F = min(destinationValues)
+            #     print('POPULATION: F=',F,'\tgeneracja:',generation)
+            #     [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
+            print('-'*70)
+            generation+=1
+        destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
+        print('LAST POPULATION: F=',min(destinationValues),'\tgeneracja:',generation)
+        [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
 
-        # while self.stopCondition(generation):
-        #     T = self.reproduction(P)
-        #     # O = self.crossover(T,P)
-        #     # O = self.mutation(O)
-        #     # self.childAnalyse(O,problem,links,demands)
-        #     # P = O            
-        #     generation+=1
-    
+        bestChromosome = population[np.argmin(destinationValues)]
+        self.bestSolutions = [self.demands]
+        self.setPopulation(bestChromosome)
+        self.saveResultsToFile()
+        
+    def success(self,successProbability):
+        if np.random.random()<successProbability: return True
+        else: return False
+
     def stopCondition(self,generation):
         if generation<5: return True
         else: return False
@@ -172,9 +205,10 @@ class Network:
     def getPopulation(self):
         return [demand.flowDistribution for demand in self.demands]
 
-    def setPopulation(self,P):
-        for index,demand in (self.demands):
-            demand.flowDistribution=P[index]
+    def setPopulation(self,chromosome):
+        # print('aaa',chromosome)
+        for index,demand in enumerate(self.demands):
+            demand.flowDistribution=chromosome[index]
 
     def generateChromosome(self):
         chromosome = []
@@ -192,37 +226,83 @@ class Network:
     def selection(self):
         pass
     
-    def crossover(self,T,P):
-        pass
+    def crossover(self,temporaryPopulation,crossoverProbability):
+        childs = []
+        for index in range(0,len(temporaryPopulation),2):
+            if index == len(temporaryPopulation)-1:
+                childs.append(temporaryPopulation[index])
+            else:
+                parenta = temporaryPopulation[index]
+                parentb = temporaryPopulation[index+1]
+                if self.success(crossoverProbability):
+                    r = np.random.randint(0,self.numberOfDemands)
+                    childa = copy.copy(parenta)
+                    childb = copy.copy(parentb)
+                    childa[r:] = parentb[r:]
+                    childb[r:] = parenta[r:]
+                    childs.append(childa)
+                    childs.append(childb)
+                else:
+                    childs.append(parenta)
+                    childs.append(parentb)
+        
+        return childs
     
-    def mutation(self,O):
-        pass
+    def mutation(self,temporaryPopulation,mutationProbability):
+        for chromosome in temporaryPopulation:
+            for gene in chromosome:
+                if self.success(mutationProbability):
+                    vector = list(range(0,len(gene)))
+                    r1 = np.random.randint(0,len(gene))
+                    vector.pop(r1)
+                    r2 = np.random.randint(0,len(gene)-1)
+                    r2 = vector[r2]
+                    tmp = gene[r1]
+                    gene[r1]=gene[r2]
+                    gene[r2]=tmp
+        return temporaryPopulation
+            
+    def reproduction(self,population,destinationValues):
+        temporaryPopulation = []
+        s = sum(destinationValues)
+        destinationValues = [value-s for value in destinationValues] 
+        s = sum(destinationValues)
+        destinationProbabilities = [value/s for value in destinationValues] 
+        for index in range(1,len(destinationProbabilities)):
+            destinationProbabilities[index]+=destinationProbabilities[index-1]
+        for chromosome in population:
+            r = np.random.random()
+            for index,probability in enumerate(destinationProbabilities):
+                if r < probability:
+                    temporaryPopulation.append(copy.copy(population[index]))
+                    break
+        return temporaryPopulation
     
-    def reproduction(self,P):
-        return 0
-    
-    def chooseBest(self):
-        pass
+
+
+    def chooseBest(self,population,temporaryPopulation,numberOfChromosomes,problem,links,demands):
+        destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
+        temporaryDestinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in temporaryPopulation]
+        population+=temporaryPopulation
+        destinationValues+=temporaryDestinationValues
+        newPopulation = []
+        for index in range(numberOfChromosomes):
+            minindex = np.argmin(destinationValues)
+            newPopulation.append(copy.copy(population[minindex]))
+            destinationValues[minindex]=float('inf')
+        return newPopulation
+
     
     def EAcalculateDAP(self,P,links,demands):
-        # links = copy([[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links])
         links, demands = self.EAsetLoads(P,links,demands)
-        # print('-'*30)
-        # print('LINKS:',links)
-        # for demand in demands:
-        #     print('DEMAND')
-        #     for index,path in enumerate(demand[1]):
-        #         print(path,demand[2][index])
-        # print('-'*30)
         F = -float('inf')
         for link in links:
             overload = link[0]-link[1]
             F = max(overload,F)
-        # print('F:',F)
         return F
     
     def EAcalculateDDAP(self,P,links,demands):
-        links = self.EAsetLoads(P,links,demands)
+        links, demands = self.EAsetLoads(P,links,demands)
         F = 0
         for link in links:
             y =math.ceil(link[0]/link[2])
@@ -237,21 +317,9 @@ class Network:
                 flow = chromosome[demandIndex][index]
                 if flow:
                     for link in path.path:
-                        # print('do linku',link,'dodano',flow)
                         links[link-1][0] += flow
                     
         return links,demands
-
-    def BFsetLoads1(self):
-        for link in self.links:
-            link.load = 0
-        for demand in self.demands:
-            for index,path in enumerate(demand.paths):
-                flow = demand.flowDistribution[index]
-                if flow:
-                    for link in path.path:
-                        self.links[link-1].load += flow
-
 
     ############################# ALGORYTM BRUTE FORCE ##############################
     
@@ -280,7 +348,7 @@ class Network:
             counter+=1
         self.F = F
         self.printBestSolutions(F,problem)
-        self.saveResultsToFile('output/BruteForce'+problem+'.txt')
+        self.saveResultsToFile()
     
     def BFcalculateDAP(self):
         self.BFsetLoads()
@@ -327,10 +395,10 @@ class Network:
         return int(solutions)
     
     def getRandomState(self):
-        state = np.random.get_state()
+        return np.random.get_state()[1][0]
     
-    def setRandomState(self):
-        np.random.random()
+    def setRandomState(self,seed):
+        np.random.seed(seed)
     
     def printProgressBar (self,iteration, total, prefix = '', suffix = '', decimals = 1, length = 80, fill = '█', printEnd = "\r"):
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
@@ -341,11 +409,35 @@ class Network:
             print()
 
 
+def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue):
+    n1 = Network(inputFileName,outputFileName)
+    if seed != 'random':
+        n1.setRandomState(seed)
+    print('SEED',n1.getRandomState())
+    n1.parse()
+    if method == 'Brute Force':
+        n1.bruteForce(problem)
+    elif method == 'Evolution':
+        n1.evolution(problem,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
 
-if __name__ == "__main__":
-    n1 = Network()
-    n1.parse('input/net4.txt')
+
     # n1.show()
     # n1.bruteForce('DAP')
     # n1.bruteForce('DDAP')
-    n1.evolution('DAP')
+    # n1.evolution('DAP')
+
+if __name__ == "__main__":
+    seed = 'random'             # ['random'|(int)]
+    inputFileName = 'net4.txt'
+    outputFileName = 'result.txt'
+    problem = 'DDAP'             # ['DAP'|'DDAP']
+    method = 'Evolution'            # ['Brute Force'|'Evolution']
+    crossoverProbability=0.75
+    mutationProbability=0.05
+    numberOfChromosomes=4
+    stopConditionType='generations'# ['time'|'generations'|'mutations'|'bestForN']
+    stopConditionValue=5
+    
+    simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
+
+
