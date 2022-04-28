@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.special, time, math
 import copy
-
+from collections import namedtuple
 
 class Path:
     def __init__(self,line):
@@ -142,42 +142,91 @@ class Network:
     ############################## ALGORYTM EWOLUCYJNY ##############################
     
     def evolution(self,problem = 'DAP'):
+        """
+        link = [load,capacity,lambdas]
+        demand = [volume,paths,flows]
+        """
+        links = [[0,link.capacity,link.lambdas] for link in self.links]
+        demands = [[demand.volume,demand.paths,[]] for demand in self.demands]
         generation = 0
-        P = None
-        self.childAnalyse(P,problem)
+        self.generatePopulation()
+        P = self.getPopulation()
+        print(P)
+        self.childAnalyse(P,problem,links,demands)
         while self.stopCondition(generation):
             T = self.reproduction(P)
-            O = self.crossover(T,P)
-            O = self.mutation(O)
-            self.childAnalyse(O,problem)
-            P = O            
+            # O = self.crossover(T,P)
+            # O = self.mutation(O)
+            # self.childAnalyse(O,problem,links,demands)
+            # P = O            
             generation+=1
     
     def stopCondition(self,generation):
         if generation<5: return True
         else: return False
     
+    def getPopulation(self):
+        return [demand.flowDistribution for demand in self.demands]
+
+    def setPopulation(self,P):
+        for index,demand in (self.demands):
+            demand.flowDistribution=P[index]
+
     def generatePopulation(self):
-        pass
+        for demand in self.demands:
+            randomArray = np.random.randint(0,demand.numberOfPaths,demand.volume)
+            demand.flowDistribution[0]=0
+            for index in randomArray:
+                demand.flowDistribution[index]+=1
     
-    def childAnalyse(self,problem):
-        pass
+    def childAnalyse(self,P,problem,links,demands):
+        if problem == 'DAP': return self.EAcalculateDAP(P,links,demands)
+        elif problem == 'DDAP': return self.EAcalculateDDAP(P,links,demands)
     
     def selection(self):
         pass
     
-    def crossover(self):
+    def crossover(self,T,P):
         pass
     
-    def mutation(self):
+    def mutation(self,O):
         pass
     
     def reproduction(self,P):
-        return None
+        return 0
     
     def chooseBest(self):
         pass
     
+    def EAcalculateDAP(self,P,links,demands):
+        links = self.EAsetLoads(P,links,demands)
+        print(links)
+        # F = -float('inf')
+        # for link in self.links:
+        #     overload = link.load-link.capacity
+        #     F = max(overload,F)
+        # return F
+    
+    def EAcalculateDDAP(self,P,links,demands):
+        links = self.EAsetLoads(P,links,demands)
+        print(links)
+        # F = 0
+        # for link in self.links:
+        #     y =math.ceil(link.load/link.lambdas)
+        #     F += y*link.fibreCost
+        # return F
+
+    def EAsetLoads(self,P,links,demands):
+        for index,demand in enumerate(demands):
+            demand[2]=P[index]
+        for demand in self.demands:
+            for index,path in enumerate(demand.paths):
+                flow = demand.flowDistribution[index]
+                if flow:
+                    for link in path.path:
+                        links[link-1][0] += flow    
+        return links
+
     ############################# ALGORYTM BRUTE FORCE ##############################
     
     def bruteForce(self,problem = 'DAP'):
@@ -186,8 +235,8 @@ class Network:
         counter = 0
         F = float('inf')
         while counter <= self.numberOfSolutions:
-            if problem == 'DAP': Ftemp = self.calculateDAP()
-            elif problem == 'DDAP': Ftemp = self.calculateDDAP()
+            if problem == 'DAP': Ftemp = self.BFcalculateDAP()
+            elif problem == 'DDAP': Ftemp = self.BFcalculateDDAP()
             if Ftemp < F:
                 F = Ftemp
                 c = copy.deepcopy(self.demands)
@@ -207,25 +256,23 @@ class Network:
         self.printBestSolutions(F,problem)
         self.saveResultsToFile('output/BruteForce'+problem+'.txt')
     
-    #################################################################################
-    
-    def calculateDAP(self):
-        self.setLoads()
+    def BFcalculateDAP(self):
+        self.BFsetLoads()
         F = -float('inf')
         for link in self.links:
             overload = link.load-link.capacity
             F = max(overload,F)
         return F
     
-    def calculateDDAP(self):
-        self.setLoads()
+    def BFcalculateDDAP(self):
+        self.BFsetLoads()
         F = 0
         for link in self.links:
             y =math.ceil(link.load/link.lambdas)
             F += y*link.fibreCost
         return F
-    
-    def setLoads(self):
+
+    def BFsetLoads(self):
         for link in self.links:
             link.load = 0
         for demand in self.demands:
@@ -235,6 +282,8 @@ class Network:
                     for link in path.path:
                         self.links[link-1].load += flow
     
+    #################################################################################
+
     def printBestSolutions(self,F,problem):
         print('\nBrute Force',problem,'\nminF:',F)
         print('Rozwiązań:',len(self.bestSolutions))
@@ -271,5 +320,6 @@ if __name__ == "__main__":
     n1 = Network()
     n1.parse('input/net4.txt')
     n1.show()
-    n1.bruteForce('DAP')
-    n1.bruteForce('DDAP')
+    # n1.bruteForce('DAP')
+    # n1.bruteForce('DDAP')
+    n1.evolution('DAP')
