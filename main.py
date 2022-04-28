@@ -92,7 +92,10 @@ class Network:
         self.stopConditionType=None
         self.stopConditionValue=None
         self.initTime=None
-    
+        self.mutationCounter=0
+        self.bestForNCounter=0
+        self.saveAllBFSolutions=False
+
     def parse(self):
         file = open('input/'+self.inputFileName)
         content = file.read()
@@ -123,11 +126,14 @@ class Network:
             linkPart+=str(link.id)+' '+str(link.lambdas)+' '+str(link.pairsInCable)+'\n'
         
         demandPart = str(self.numberOfDemands)+'\n'
-        for demand in self.bestSolutions[0]:
-            demandFlow = str(demand.id)+' '+str(demand.numberOfPaths)+'\n'
-            for index,flow in enumerate(demand.flowDistribution):
-                demandFlow+=str(index+1)+' '+str(flow)+'\n'
-            demandPart+=demandFlow+'\n'
+        for index,solution in enumerate(self.bestSolutions):
+            if index == 0 or self.saveAllBFSolutions:
+                demandPart+='\n'
+                for demand in solution:
+                    demandFlow = str(demand.id)+' '+str(demand.numberOfPaths)+'\n'
+                    for index,flow in enumerate(demand.flowDistribution):
+                        demandFlow+=str(index+1)+' '+str(flow)+'\n'
+                    demandPart+=demandFlow+'\n'
         
         output = linkPart+'\n'+demandPart
         print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
@@ -179,6 +185,9 @@ class Network:
             population = bestPopulation
             
             destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
+            if F == min(destinationValues):
+                self.bestForNCounter+=1
+            else: self.bestForNCounter=0
             # if min(destinationValues)<F:
             #     F = min(destinationValues)
             #     print('POPULATION: F=',F,'\tgeneracja:',generation)
@@ -199,14 +208,23 @@ class Network:
         else: return False
 
     def stopCondition(self,generation):
-        if generation<5: return True
-        else: return False
-    
+        if self.stopConditionType == 'time':
+            if time.time()-self.initTime<self.stopConditionValue: return True
+            else: return False
+        elif self.stopConditionType == 'mutations':
+            if self.mutationCounter<self.stopConditionValue: return True
+            else: return False
+        elif self.stopConditionType == 'generations':
+            if generation<self.stopConditionValue: return True
+            else: return False
+        elif self.stopConditionType == 'bestForN':
+            if self.bestForNCounter<self.stopConditionValue: return True
+            else: return False
+        
     def getPopulation(self):
         return [demand.flowDistribution for demand in self.demands]
 
     def setPopulation(self,chromosome):
-        # print('aaa',chromosome)
         for index,demand in enumerate(self.demands):
             demand.flowDistribution=chromosome[index]
 
@@ -252,6 +270,7 @@ class Network:
         for chromosome in temporaryPopulation:
             for gene in chromosome:
                 if self.success(mutationProbability):
+                    self.mutationCounter+=1
                     vector = list(range(0,len(gene)))
                     r1 = np.random.randint(0,len(gene))
                     vector.pop(r1)
@@ -323,7 +342,8 @@ class Network:
 
     ############################# ALGORYTM BRUTE FORCE ##############################
     
-    def bruteForce(self,problem = 'DAP'):
+    def bruteForce(self,problem = 'DAP',saveAllBFSolutions=False):
+        self.saveAllBFSolutions = saveAllBFSolutions
         self.numberOfSolutions = self.getNumberOfSolutions()
         print('\n  ROZWIĄZAŃ:',self.numberOfSolutions,'\n')
         counter = 0
@@ -408,36 +428,30 @@ class Network:
         if iteration == total: 
             print()
 
-
-def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue):
+def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions):
     n1 = Network(inputFileName,outputFileName)
     if seed != 'random':
         n1.setRandomState(seed)
     print('SEED',n1.getRandomState())
     n1.parse()
     if method == 'Brute Force':
-        n1.bruteForce(problem)
+        n1.bruteForce(problem,saveAllBFSolutions)
     elif method == 'Evolution':
         n1.evolution(problem,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
-
-
-    # n1.show()
-    # n1.bruteForce('DAP')
-    # n1.bruteForce('DDAP')
-    # n1.evolution('DAP')
 
 if __name__ == "__main__":
     seed = 'random'             # ['random'|(int)]
     inputFileName = 'net4.txt'
     outputFileName = 'result.txt'
     problem = 'DDAP'             # ['DAP'|'DDAP']
-    method = 'Evolution'            # ['Brute Force'|'Evolution']
+    method = 'Brute Force'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
     numberOfChromosomes=4
     stopConditionType='generations'# ['time'|'generations'|'mutations'|'bestForN']
     stopConditionValue=5
+    saveAllBFSolutions=True
     
-    simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
+    simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions)
 
 
