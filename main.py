@@ -403,7 +403,7 @@ class Network:
         #     for demand in solution:
         #         print(demand.flowDistribution,end=' ')
         #     print()
-    
+        
     def getNumberOfSolutions(self):
         solutions = 1
         for demand in self.demands:
