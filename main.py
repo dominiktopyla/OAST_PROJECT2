@@ -134,7 +134,7 @@ class Network:
                 demandPart+='---\n\n'
         
         output = linkPart+'\n'+demandPart
-        print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
+        # print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
         file.write(output)
         file.close()
     
@@ -158,34 +158,36 @@ class Network:
         """
         self.stopConditionType = stopConditionType
         self.stopConditionValue = stopConditionValue
-        if stopConditionValue == 'time': self.initTime = time.time()
+        if self.stopConditionType == 'time':  self.initTime = time.time()
         links = [[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links]
         demands = [[demand.volume,demand.paths,[]] for demand in self.demands]
         generation = 0
+        print('Liczba chromosomów: ', numberOfChromosomes)
         population = [self.generateChromosome() for chromosome in range(numberOfChromosomes)]
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
         F=min(destinationValues)
+        # print('POPULATION: F=',F,'\tgeneracja:',generation)
+        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)] 
         while self.stopCondition(generation):
-            # print('POPULATION: F=',F,'\tgeneracja:',generation)
-            # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
+            print('POPULATION: F=',F,'\tgeneracja:',generation)
+            [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
             temporaryPopulation = self.reproduction(population,destinationValues)
-            # print('TMP POPULATION:')
-            # [print(chromosome) for chromosome in temporaryPopulation]
+            print('TMP POPULATION:')
+            [print(chromosome) for chromosome in temporaryPopulation]
             temporaryPopulation = self.crossover(temporaryPopulation,crossoverProbability)
-            # print('AFTER CROSSOVER:')
-            # [print(chromosome) for chromosome in temporaryPopulation]
+            print('AFTER CROSSOVER:')
+            [print(chromosome) for chromosome in temporaryPopulation]
             temporaryPopulation = self.mutation(temporaryPopulation,mutationProbability)
-            # print('AFTER MUTATION:')
-            # [print(chromosome) for chromosome in temporaryPopulation]
+            print('AFTER MUTATION:')
+            [print(chromosome) for chromosome in temporaryPopulation]
             bestPopulation = self.chooseBest(population,temporaryPopulation,numberOfChromosomes,problem,links,demands)
-            # print('BEST POPULATION:')
-            # [print(chromosome) for chromosome in bestPopulation]
+            print('BEST POPULATION:')
+            [print(chromosome) for chromosome in bestPopulation]
             population = bestPopulation
             
             destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
-            if F == min(destinationValues):
-                self.bestForNCounter+=1
-            else: self.bestForNCounter=0
+            if F > min(destinationValues): self.bestForNCounter=0
+            else: self.bestForNCounter+=1
             if min(destinationValues)<F:
                 F = min(destinationValues)
                 print('POPULATION: F=',F,'\tgeneracja:',generation)
@@ -200,6 +202,8 @@ class Network:
         self.bestSolutions = [self.demands]
         self.setPopulation(bestChromosome)
         self.saveResultsToFile()
+        # print('POPULATION: F=',F,'\tgeneracja:',generation)
+        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
         
     def success(self,successProbability):
         if np.random.random()<successProbability: return True
@@ -293,9 +297,7 @@ class Network:
                 if r < probability:
                     temporaryPopulation.append(copy.copy(population[index]))
                     break
-        return temporaryPopulation
-    
-
+        return temporaryPopulation   
 
     def chooseBest(self,population,temporaryPopulation,numberOfChromosomes,problem,links,demands):
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
@@ -308,7 +310,6 @@ class Network:
             newPopulation.append(copy.copy(population[minindex]))
             destinationValues[minindex]=float('inf')
         return newPopulation
-
     
     def EAcalculateDAP(self,P,links,demands):
         links, demands = self.EAsetLoads(P,links,demands)
