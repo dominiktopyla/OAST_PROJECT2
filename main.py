@@ -166,25 +166,14 @@ class Network:
         population = [self.generateChromosome() for chromosome in range(numberOfChromosomes)]
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
         F=min(destinationValues)
-        # print('POPULATION: F=',F,'\tgeneracja:',generation)
-        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)] 
         while self.stopCondition(generation):
-            print('POPULATION: F=',F,'\tgeneracja:',generation)
-            [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
-            temporaryPopulation = self.reproduction(population,destinationValues)
-            print('TMP POPULATION:')
-            [print(chromosome) for chromosome in temporaryPopulation]
+            temporaryPopulation = self.reproduction(copy.deepcopy(population),destinationValues)
             temporaryPopulation = self.crossover(temporaryPopulation,crossoverProbability)
-            print('AFTER CROSSOVER:')
-            [print(chromosome) for chromosome in temporaryPopulation]
             temporaryPopulation = self.mutation(temporaryPopulation,mutationProbability)
-            print('AFTER MUTATION:')
-            [print(chromosome) for chromosome in temporaryPopulation]
             bestPopulation = self.chooseBest(population,temporaryPopulation,numberOfChromosomes,problem,links,demands)
-            print('BEST POPULATION:')
-            [print(chromosome) for chromosome in bestPopulation]
+            # print('BEST POPULATION:')
+            # [print(chromosome,' F:',copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands)))) for index,chromosome in enumerate(bestPopulation)]
             population = bestPopulation
-            
             destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
             if F > min(destinationValues): self.bestForNCounter=0
             else: self.bestForNCounter+=1
@@ -192,18 +181,13 @@ class Network:
                 F = min(destinationValues)
                 print('POPULATION: F=',F,'\tgeneracja:',generation)
                 [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
-            # print('-'*70)
             generation+=1
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
-        # print('LAST POPULATION: F=',min(destinationValues),'\tgeneracja:',generation)
-        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]
-
+        
         bestChromosome = population[np.argmin(destinationValues)]
         self.bestSolutions = [self.demands]
         self.setPopulation(bestChromosome)
         self.saveResultsToFile()
-        # print('POPULATION: F=',F,'\tgeneracja:',generation)
-        # [print(chromosome,' F:',destinationValues[index]) for index,chromosome in enumerate(population)]  
         
     def success(self,successProbability):
         if np.random.random()<successProbability: return True
@@ -429,8 +413,9 @@ class Network:
 
 def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions):
     n1 = Network(inputFileName,outputFileName)
-    if seed != 'random':
-        n1.setRandomState(seed)
+    if seed == 'random':
+        n1.setRandomState(np.random.randint(1000000000))
+    else: n1.setRandomState(seed)
     print('SEED',n1.getRandomState())
     n1.parse()
     if method == 'Brute Force':
@@ -439,16 +424,16 @@ def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbabi
         n1.evolution(problem,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
 
 if __name__ == "__main__":
-    seed = 'random'             # ['random'|(int)]
+    seed = 'random'          # ['random'|(int)]
     inputFileName = 'net4.txt'
     outputFileName = 'result.txt'
-    problem = 'DDAP'             # ['DAP'|'DDAP']
+    problem = 'DAP'             # ['DAP'|'DDAP']
     method = 'Evolution'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
     numberOfChromosomes=4
     stopConditionType='generations'# ['time'|'generations'|'mutations'|'bestForN']
-    stopConditionValue=10
+    stopConditionValue=1000000
     saveAllBFSolutions=True
     
     simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions)
