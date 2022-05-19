@@ -162,7 +162,6 @@ class Network:
         links = [[0,link.capacity,link.lambdas,link.fibreCost] for link in self.links]
         demands = [[demand.volume,demand.paths,[]] for demand in self.demands]
         generation = 0
-        print('Liczba chromosomów: ', numberOfChromosomes,'\tP. krosowania:',crossoverProbability,'\tP. mutacji:',mutationProbability)
         population = [self.generateChromosome() for chromosome in range(numberOfChromosomes)]
         destinationValues = [copy.copy(self.destinationFunction(chromosome,problem,copy.deepcopy(links),copy.copy(demands))) for chromosome in population]
         F=min(destinationValues)
@@ -188,6 +187,7 @@ class Network:
         self.bestSolutions = [self.demands]
         self.setPopulation(bestChromosome)
         self.saveResultsToFile()
+        print('Problem: ', problem, '\tLiczba chromosomów: ', numberOfChromosomes,'\tP. krosowania:',crossoverProbability,'\tP. mutacji:',mutationProbability)
         
     def success(self,successProbability):
         if np.random.random()<successProbability: return True
@@ -255,7 +255,7 @@ class Network:
     def mutation(self,temporaryPopulation,mutationProbability):
         for chromosome in temporaryPopulation:
             for gene in chromosome:
-                if self.success(mutationProbability):
+                if self.success(mutationProbability) and len(gene)>1:
                     self.mutationCounter+=1
                     vector = list(range(0,len(gene)))
                     r1 = np.random.randint(0,len(gene))
@@ -424,16 +424,16 @@ def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbabi
         n1.evolution(problem,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue)
 
 if __name__ == "__main__":
-    seed = 681927034          # ['random'|(int)]
-    inputFileName = 'net4.txt'
+    seed =  563472716         # ['random'|(int)]
+    inputFileName = 'net12_2.txt'
     outputFileName = 'result.txt'
     problem = 'DAP'             # ['DAP'|'DDAP']
     method = 'Evolution'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
-    numberOfChromosomes=4
-    stopConditionType='bestForN'# ['time'|'generations'|'mutations'|'bestForN']
-    stopConditionValue=10000
+    numberOfChromosomes=300
+    stopConditionType='time'# ['time'|'generations'|'mutations'|'bestForN']
+    stopConditionValue=150
     saveAllBFSolutions=True
     
     simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions)
