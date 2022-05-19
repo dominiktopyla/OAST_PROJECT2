@@ -431,10 +431,10 @@ def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbabi
 
 if __name__ == "__main__":
     seed =  563472716         # ['random'|(int)]
-    inputFileName = 'net12_2.txt'
-    outputFileName = 'resultDDAPNet12_2.txt'
-    problem = 'DDAP'             # ['DAP'|'DDAP']
-    method = 'Evolution'            # ['Brute Force'|'Evolution']
+    inputFileName = 'net4.txt'
+    outputFileName = 'resultBFDAPNet4.txt'
+    problem = 'DAP'             # ['DAP'|'DDAP']
+    method = 'Brute Force'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
     numberOfChromosomes=400
