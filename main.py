@@ -93,6 +93,7 @@ class Network:
         self.mutationCounter=0
         self.bestForNCounter=0
         self.saveAllBFSolutions=False
+        self.seed = None
 
     def parse(self):
         file = open('input/'+self.inputFileName)
@@ -117,9 +118,12 @@ class Network:
         for id,line in enumerate(lines):
             self.demands.append(Demand(line,id+1))
     
-    def saveResultsToFile(self):
-        file = open('output/'+self.outputFileName,'w')
-        linkPart = str(self.numberOfLinks)+'\n'
+    def saveResultsToFile(self,method,problem,F):
+        parameters = 'Problem: '+str(problem)+'\tMetoda: '+str(method)
+        if method == 'Evolution':
+            parameters+='\tSEED: '+str(self.seed)+'\tLiczba chromosomów: '+str(numberOfChromosomes)+'\tP. krosowania:'+str(crossoverProbability)+'\tP. mutacji:'+str(mutationProbability)
+        parameters+='\nRozwiązanie: '+str(F)+'\n\n'
+        linkPart = parameters+str(self.numberOfLinks)+'\n'
         for link in self.links:
             linkPart+=str(link.id)+' '+str(link.lambdas)+' '+str(link.pairsInCable)+'\n'
         
@@ -135,6 +139,7 @@ class Network:
         
         output = linkPart+'\n'+demandPart
         # print('\nPLIK ('+self.outputFileName+'):\n','-'*30,'\n',output,'-'*30,sep='')
+        file = open('output/'+self.outputFileName,'w')
         file.write(output)
         file.close()
     
@@ -186,7 +191,7 @@ class Network:
         bestChromosome = population[np.argmin(destinationValues)]
         self.bestSolutions = [self.demands]
         self.setPopulation(bestChromosome)
-        self.saveResultsToFile()
+        self.saveResultsToFile('Evolution',problem,F)
         print('Problem: ', problem, '\tLiczba chromosomów: ', numberOfChromosomes,'\tP. krosowania:',crossoverProbability,'\tP. mutacji:',mutationProbability)
         
     def success(self,successProbability):
@@ -351,7 +356,7 @@ class Network:
             counter+=1
         self.F = F
         self.printBestSolutions(F,problem)
-        self.saveResultsToFile()
+        self.saveResultsToFile('Brute Force',problem,F)
     
     def BFcalculateDAP(self):
         self.BFsetLoads()
@@ -417,6 +422,7 @@ def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbabi
         n1.setRandomState(np.random.randint(1000000000))
     else: n1.setRandomState(seed)
     print('SEED',n1.getRandomState())
+    n1.seed = n1.getRandomState()
     n1.parse()
     if method == 'Brute Force':
         n1.bruteForce(problem,saveAllBFSolutions)
@@ -425,15 +431,15 @@ def simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbabi
 
 if __name__ == "__main__":
     seed =  563472716         # ['random'|(int)]
-    inputFileName = 'net12_2.txt'
-    outputFileName = 'result.txt'
+    inputFileName = 'net12_1.txt'
+    outputFileName = 'resultDAPNet12_1.txt'
     problem = 'DAP'             # ['DAP'|'DDAP']
     method = 'Evolution'            # ['Brute Force'|'Evolution']
     crossoverProbability=0.75
     mutationProbability=0.05
-    numberOfChromosomes=300
+    numberOfChromosomes=400
     stopConditionType='time'# ['time'|'generations'|'mutations'|'bestForN']
-    stopConditionValue=150
+    stopConditionValue=15
     saveAllBFSolutions=True
     
     simulation(seed,inputFileName,outputFileName,problem,method,crossoverProbability,mutationProbability,numberOfChromosomes,stopConditionType,stopConditionValue,saveAllBFSolutions)
